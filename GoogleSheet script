@@ -1,0 +1,99 @@
+var MainSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Sheet1");
+var SpreasheetURL_permanent = "https://docs.google.com/spreadsheets/d/1IRSncdDmsDzsMeri5ZuHZSydB-PJ6ko9xWGOtJrG_v0/edit?usp=sharing";
+var Spreasheet_permanent = SpreadsheetApp.openByUrl(SpreasheetURL_permanent);
+var AllDatatSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("station_data");
+var StartingCell = MainSheet.getRange("A1");
+var LastRow=0;
+var LastGOODDataDate;
+
+
+function movealllines() {
+  var lock = LockService.getPublicLock(); //the spreadsheet will be lock and cannot be modified during the execution of the script
+  lock.waitLock(30000); // wait 30 seconds before conceding defeat
+  try {
+//    LastRow=MainSheet.getLastRow();
+    while (!MainSheet.getRange("A1:F50").isBlank()){
+      moveline();
+    }
+  } catch(e) {
+
+  } finally { //release lock
+    lock.releaseLock();
+  }
+}
+
+function moveline() {
+  var row = StartingCell.getRow();
+  var numColumns = MainSheet.getLastColumn();
+  var target = AllDatatSheet.getRange(AllDatatSheet.getLastRow() + 1, 1);
+  MainSheet.getRange(row, 1, 1, numColumns).moveTo(target);
+  readdata()
+  MainSheet.deleteRow(row);
+}
+
+function readdata() {
+  var numRows = AllDatatSheet.getLastRow(); 
+  var MessageDateGoogle = AllDatatSheet.getRange(numRows, 1).getValue();
+  var MessageName = AllDatatSheet.getRange(numRows, 2).getValue();
+  var MessageString = AllDatatSheet.getRange(numRows, 3).getValue();
+  var MessageRSSI = AllDatatSheet.getRange(numRows, 4).getValue();
+  var destFileIds = MessageString.toString().split(",");
+  var numberFields = destFileIds.length;
+
+  var StationSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("stationELSE");
+  var StationSheet_permanent = Spreasheet_permanent.getSheetByName("stationELSE");
+  switch (destFileIds[1])  {
+    case "Station 1":
+        StationSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("station1");
+        StationSheet_permanent = Spreasheet_permanent.getSheetByName("station1"); 
+        break;
+    case "Station 2":
+        StationSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("station2");
+        StationSheet_permanent = Spreasheet_permanent.getSheetByName("station2");  
+        break;
+    case "Station 3":
+        StationSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("station3");
+        StationSheet_permanent = Spreasheet_permanent.getSheetByName("station3");  
+        break;
+  }
+
+  var NewValueStationSheet = StationSheet.getRange(StationSheet.getLastRow() + 1, 1);
+  var NewValueStationSheet_permanent = StationSheet_permanent.getRange(StationSheet_permanent.getLastRow() + 1, 1);
+  var LastRow = StationSheet.getLastRow();
+  var LastRow_permanent = StationSheet_permanent.getLastRow();
+
+  // TEST DATA
+  var flag = "Good data";
+  for (var i = 0; i <= numberFields -1; i++) {
+    if (i==0 & destFileIds[i] != "NIE Rain Garden") { flag="Wrong data";}
+    if (i>4 & isNaN(destFileIds[i])) { flag="Wrong data";}
+  }
+
+  if (LastGOODDataDate!=MessageDateGoogle && flag=="Good data") {
+    LastGOODDataDate = MessageDateGoogle;
+        // WRITE DATA
+    StationSheet.getRange(LastRow + 1, 1).setValue(MessageDateGoogle);
+    StationSheet.getRange(LastRow + 1, 2).setValue(MessageName);  
+    for (var i = 0; i <= destFileIds.length -1; i++) {
+      StationSheet.getRange(LastRow + 1, 3+i).setValue(destFileIds[i]);
+    }
+    StationSheet.getRange(LastRow + 1, numberFields+3).setValue(MessageRSSI);
+
+    StationSheet_permanent.getRange(LastRow_permanent + 1, 1).setValue(MessageDateGoogle);
+    StationSheet_permanent.getRange(LastRow_permanent + 1, 2).setValue(MessageName);  
+    for (var i = 0; i <= destFileIds.length -1; i++) {
+      StationSheet_permanent.getRange(LastRow_permanent + 1, 3+i).setValue(destFileIds[i]);
+    }
+    StationSheet_permanent.getRange(LastRow_permanent + 1, numberFields+3).setValue(MessageRSSI);    
+  }
+} 
+
+//----------------------------------------------------------------------------
+//create a new trigger to clean the spreadsheet
+//----------------------------------------------------------------------------
+function STARTdataclean() {
+  ScriptApp.newTrigger("movealllines") // function to move all data
+      .timeBased()
+      .everyMinutes(1)
+      .create();
+}
